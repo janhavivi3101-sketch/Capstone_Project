@@ -1,123 +1,111 @@
 pipeline {
-    agent any
+agent any
 
-    tools {
-        maven 'Maven 3.9'
-        jdk 'JDK 17'
-    }
+```
+tools {
+    maven 'Maven 3.9'
+    jdk 'JDK 17'
+}
 
-    options {
-        buildDiscarder(logRotator(
-            numToKeepStr: '5',
-            artifactNumToKeepStr: '5'
-        ))
-        timestamps()
-        timeout(time: 30, unit: 'MINUTES')
-    }
+options {
+    buildDiscarder(logRotator(
+        numToKeepStr: '5',
+        artifactNumToKeepStr: '5'
+    ))
+    timestamps()
+    timeout(time: 30, unit: 'MINUTES')
+}
 
-    parameters {
-        booleanParam(
-            name: 'HEADLESS',
-            defaultValue: true,
-            description: 'Run Chrome in headless mode'
-        )
+stages {
 
-        string(
-            name: 'BRANCH',
-            defaultValue: 'main',
-            description: 'Git branch to build'
-        )
-    }
-
-    stages {
-
-        stage('Checkout') {
-            steps {
-                git branch: "${params.BRANCH}",
-                    url: 'https://github.com/janhavivi3101-sketch/Capstone_Project.git'
-            }
-        }
-
-        stage('Build') {
-            steps {
+    stage('Build') {
+        steps {
+            dir('NotesFramework') {
                 bat 'mvn clean compile test-compile'
             }
         }
+    }
 
-        stage('Run Tests') {
-            steps {
-                bat "mvn test -Dheadless=${params.HEADLESS} -Dmaven.test.failure.ignore=true"
-            }
-
-            post {
-                always {
-                    junit(
-                        testResults: '**/target/surefire-reports/**/*.xml',
-                        allowEmptyResults: true
-                    )
-                }
+    stage('Run Tests') {
+        steps {
+            dir('NotesFramework') {
+                bat 'mvn test -Dmaven.test.failure.ignore=true'
             }
         }
 
-        stage('Extent Report') {
-            steps {
-                archiveArtifacts(
-                    artifacts: 'target/extent-report/**',
-                    allowEmptyArchive: true
-                )
-
-                publishHTML([
-                    allowMissing: true,
-                    alwaysLinkToLastBuild: true,
-                    keepAll: true,
-                    reportDir: 'target/extent-report',
-                    reportFiles: 'index.html',
-                    reportName: 'Extent Report',
-                    reportTitles: 'Notes App Automation Report'
-                ])
-            }
-        }
-
-        stage('Allure Report') {
-            steps {
-                allure([
-                    includeProperties: false,
-                    jdk: '',
-                    results: [[path: 'target/allure-results']]
-                ])
-            }
-        }
-
-        stage('Archive Screenshots') {
-            steps {
-                archiveArtifacts(
-                    artifacts: 'screenshots/**',
-                    allowEmptyArchive: true
+        post {
+            always {
+                junit(
+                    testResults: 'NotesFramework/**/target/surefire-reports/**/*.xml',
+                    allowEmptyResults: true
                 )
             }
         }
     }
 
-    post {
+    stage('Extent Report') {
+        steps {
 
-        success {
-            echo 'Pipeline completed successfully.'
+            archiveArtifacts(
+                artifacts: 'NotesFramework/target/extent-report/**',
+                allowEmptyArchive: true
+            )
+
+            publishHTML(target: [
+                allowMissing: true,
+                alwaysLinkToLastBuild: true,
+                keepAll: true,
+                reportDir: 'NotesFramework/target/extent-report',
+                reportFiles: 'index.html',
+                reportName: 'Extent Report',
+                reportTitles: 'Notes App Automation Report'
+            ])
         }
+    }
 
-        unstable {
-            echo 'Build completed but some tests failed.'
+    stage('Allure Report') {
+        steps {
+            allure([
+                includeProperties: false,
+                jdk: '',
+                results: [[path: 'NotesFramework/target/allure-results']]
+            ])
         }
+    }
 
-        failure {
-            echo 'Pipeline FAILED - check console output.'
-        }
-
-        always {
-            cleanWs(
-                cleanWhenNotBuilt: false,
-                cleanWhenFailure: false,
-                cleanWhenSuccess: true
+    stage('Archive Screenshots') {
+        steps {
+            archiveArtifacts(
+                artifacts: 'NotesFramework/screenshots/**',
+                allowEmptyArchive: true
             )
         }
     }
+}
+
+post {
+
+    success {
+        echo 'Pipeline completed successfully.'
+    }
+
+    unstable {
+        echo 'Build completed but some tests failed.'
+    }
+
+    failure {
+        echo 'Pipeline FAILED - check console output.'
+    }
+
+    always {
+
+        cleanWs(
+            cleanWhenNotBuilt: false,
+            cleanWhenFailure: false,
+            cleanWhenSuccess: true
+        )
+    }
+}
+```
+
 }
