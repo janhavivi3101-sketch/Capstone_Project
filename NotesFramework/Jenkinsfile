@@ -1,131 +1,123 @@
 pipeline {
     agent any
 
-    // ── tool names must match what you configured in
-    //    Manage Jenkins → Tools → JDK / Maven installations
     tools {
         maven 'Maven 3.9'
-        jdk   'JDK 17'
+        jdk 'JDK 17'
     }
 
-    // keep the last 5 builds + their artifacts so the server doesn't fill up
     options {
-        buildDiscarder(logRotator(numToKeepStr: '5', artifactNumToKeepStr: '5'))
+        buildDiscarder(logRotator(
+            numToKeepStr: '5',
+            artifactNumToKeepStr: '5'
+        ))
         timestamps()
         timeout(time: 30, unit: 'MINUTES')
     }
 
-    // ---------- configurable parameters ----------
-    // Run the build and choose headless on/off without editing this file
     parameters {
-        booleanParam(name: 'HEADLESS', defaultValue: true,
-                     description: 'Run Chrome in headless mode (must be true on CI servers with no display)')
-        string(name: 'BRANCH', defaultValue: 'main',
-               description: 'Git branch to build')
+        booleanParam(
+            name: 'HEADLESS',
+            defaultValue: true,
+            description: 'Run Chrome in headless mode'
+        )
+
+        string(
+            name: 'BRANCH',
+            defaultValue: 'main',
+            description: 'Git branch to build'
+        )
     }
 
     stages {
 
-        // ── 1. pull source ──────────────────────────────────────────────────
         stage('Checkout') {
             steps {
-                // replace this URL with your actual repo; the branch comes from the parameter above
                 git branch: "${params.BRANCH}",
-                    url: 'https://github.com/your-org/HybridNotesFramework.git'
+                    url: 'https://github.com/janhavivi3101-sketch/Capstone_Project.git'
             }
         }
 
-        // ── 2. compile everything so we catch syntax errors before running tests ──
         stage('Build') {
             steps {
-                sh 'mvn clean compile test-compile -q'
+                bat 'mvn clean compile test-compile'
             }
         }
 
-        // ── 3. run the full suite ───────────────────────────────────────────
         stage('Run Tests') {
             steps {
-                sh """
-                    mvn test \
-                        -Dheadless=${params.HEADLESS} \
-                        -Dmaven.test.failure.ignore=true
-                """
+                bat "mvn test -Dheadless=${params.HEADLESS} -Dmaven.test.failure.ignore=true"
             }
+
             post {
                 always {
-                    // publish the JUnit-format XML so Jenkins shows a test trend graph
-                    junit testResults: '**/target/surefire-reports/junitreports/TEST-*.xml',
-                          allowEmptyResults: true
+                    junit(
+                        testResults: '**/target/surefire-reports/**/*.xml',
+                        allowEmptyResults: true
+                    )
                 }
             }
         }
 
-        // ── 4. Extent HTML report ───────────────────────────────────────────
-        // The report is generated during the test run by ExtentTestListener.
-        // This stage archives it as a Jenkins artifact and publishes it as a
-        // navigable HTML page using the HTML Publisher plugin.
         stage('Extent Report') {
             steps {
-                // archive the whole folder so screenshots embedded via base64 survive
-                archiveArtifacts artifacts: 'target/extent-report/**',
-                                 allowEmptyArchive: true
+                archiveArtifacts(
+                    artifacts: 'target/extent-report/**',
+                    allowEmptyArchive: true
+                )
 
-                // HTML Publisher plugin: gives a "Extent Report" link on the build page
-                // Install from: Manage Jenkins → Plugins → HTML Publisher
-                publishHTML(target: [
-                    allowMissing         : true,
+                publishHTML([
+                    allowMissing: true,
                     alwaysLinkToLastBuild: true,
-                    keepAll              : true,
-                    reportDir            : 'target/extent-report',
-                    reportFiles          : 'index.html',
-                    reportName           : 'Extent Report',
-                    reportTitles         : 'Notes App - Automation Report'
+                    keepAll: true,
+                    reportDir: 'target/extent-report',
+                    reportFiles: 'index.html',
+                    reportName: 'Extent Report',
+                    reportTitles: 'Notes App Automation Report'
                 ])
             }
         }
 
-        // ── 5. Allure report ────────────────────────────────────────────────
-        // Allure plugin for Jenkins: Manage Jenkins → Plugins → Allure
-        // Configure allure commandline: Manage Jenkins → Tools → Allure Commandline
         stage('Allure Report') {
             steps {
                 allure([
                     includeProperties: false,
-                    jdk              : '',
-                    results          : [[path: 'target/allure-results']]
+                    jdk: '',
+                    results: [[path: 'target/allure-results']]
                 ])
             }
         }
 
-        // ── 6. screenshots ──────────────────────────────────────────────────
-        // Only failure screenshots land here (ScreenshotUtils writes on failure).
-        // archiveArtifacts makes them downloadable from the build page.
         stage('Archive Screenshots') {
             steps {
-                archiveArtifacts artifacts: 'screenshots/**',
-                                 allowEmptyArchive: true
+                archiveArtifacts(
+                    artifacts: 'screenshots/**',
+                    allowEmptyArchive: true
+                )
             }
         }
     }
 
-    // ── post-build ──────────────────────────────────────────────────────────
     post {
+
         success {
-            echo "All stages passed. Extent report: ${env.BUILD_URL}Extent_20Report/"
+            echo 'Pipeline completed successfully.'
         }
+
         unstable {
-            // unstable = build succeeded but some tests failed (testFailureIgnore=true)
-            echo "Build is UNSTABLE - some tests failed. Check the Extent report."
+            echo 'Build completed but some tests failed.'
         }
+
         failure {
-            echo "Pipeline FAILED - likely a compile or environment error, not a test failure."
+            echo 'Pipeline FAILED - check console output.'
         }
+
         always {
-            // clean up the workspace to avoid disk bloat on the Jenkins agent
-            // comment this out if you want to inspect files after the build
-            cleanWs(cleanWhenNotBuilt: false,
-                    cleanWhenFailure : false,
-                    cleanWhenSuccess : true)
+            cleanWs(
+                cleanWhenNotBuilt: false,
+                cleanWhenFailure: false,
+                cleanWhenSuccess: true
+            )
         }
     }
 }
