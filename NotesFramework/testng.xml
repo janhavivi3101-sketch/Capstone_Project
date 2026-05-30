@@ -1,0 +1,37 @@
+<!DOCTYPE suite SYSTEM "https://testng.org/testng-1.0.dtd">
+
+<suite name="Notes App Test Suite" parallel="tests" thread-count="2" verbose="1">
+
+    <!-- Extent report listener - hooks into every test result automatically -->
+    <listeners>
+        <listener class-name="com.notesapp.reports.ExtentTestListener"/>
+    </listeners>
+
+    <!-- UI and API run in parallel with each other -->
+    <test name="UI Tests">
+        <classes>
+            <class name="com.notesapp.tests.ui.LoginTest"/>
+            <class name="com.notesapp.tests.ui.CreateNoteTest"/>
+        </classes>
+    </test>
+
+    <test name="API Tests">
+        <classes>
+            <class name="com.notesapp.tests.api.LoginAPITest"/>
+            <class name="com.notesapp.tests.api.CreateNoteAPITest"/>
+            <class name="com.notesapp.tests.api.GetNoteAPITest"/>
+            <class name="com.notesapp.tests.api.UpdateNoteAPITest"/>
+            <class name="com.notesapp.tests.api.DeleteNoteAPITest"/>
+        </classes>
+    </test>
+
+    <!-- E2E runs after. thread-count=2 at suite level means UI+API share 2 threads,
+         but TestNG still runs <test> blocks sequentially unless they overlap in time.
+         HybridTest gets its own fresh browser because BaseTest.setUp() is @BeforeClass. -->
+    <test name="Hybrid E2E Tests">
+        <classes>
+            <class name="com.notesapp.tests.e2e.HybridTest"/>
+        </classes>
+    </test>
+
+</suite>
